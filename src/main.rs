@@ -1,9 +1,7 @@
 #[macro_use]
 extern crate clap;
-use bzip2::read::BzDecoder;
-use clap::ArgMatches;
 use clap::{App, AppSettings, Arg};
-use log::{info, warn};
+use log::info;
 use std::env;
 use wikidata_head::parser::{parse_and_output, Config};
 
