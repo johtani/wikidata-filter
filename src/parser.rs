@@ -1,22 +1,22 @@
-use crate::output::OutputJson;
+use crate::output::{OutputJson, OutputManager};
 use bzip2::read::BzDecoder;
 use clap::ArgMatches;
 use core::result::Result::{Err, Ok};
+use futures::executor::{block_on, ThreadPool};
+use futures::task::SpawnExt;
 use log::{info, warn};
-use serde::Deserializer;
-use serde_derive::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     input_file: String,
     output_prefix: String,
-    chunk_size: u16,
+    chunk_size: usize,
     properties: Vec<String>,
     lang: String,
+    with_limiter: bool,
 }
 
 impl Config {
@@ -29,9 +29,10 @@ impl Config {
         return Config {
             input_file: input_file.to_string(),
             output_prefix: output_prefix.to_string(),
-            chunk_size: 10000,
+            chunk_size: 100000,
             properties,
             lang: lang.to_string(),
+            with_limiter: false,
         };
     }
 }
@@ -111,39 +112,74 @@ impl Document {
     }
 }
 
+async fn process_buffer(buffer: Vec<String>, config: Config, mut output: OutputJson) {
+    for article in buffer {
+        let mut doc = Document {
+            original_map: serde_json::from_str(article.as_str())
+                .expect("something wrong during parsing json"),
+            new_map: Map::new(),
+        };
+        process_doc(&mut doc, &config);
+        output.output(doc.to_json_string());
+    }
+    output.flush();
+}
+
 pub fn parse_and_output(config: &Config) {
+    let pool = ThreadPool::builder()
+        .create()
+        .expect("Create thread pool error");
+
+    let mut futures = vec![];
     let input_file = &config.input_file;
+    let mut output_manager = OutputManager::new(&config.output_prefix);
 
     info!("open file...");
     let file = File::open(input_file).expect("Input file open error");
     let buf = BzDecoder::new(file);
-    let mut output = OutputJson::new(&config.output_prefix, config.chunk_size);
-
     let mut count = 0;
+    let mut buffer: Vec<String> = vec![];
+
     for line in BufReader::new(buf).lines() {
         match line {
             Ok(mut article) => {
                 if article != "[" && article != "]" {
                     article.pop().unwrap();
-                    let mut doc = Document {
-                        original_map: serde_json::from_str(article.as_str())
-                            .expect("something wrong during parsing json"),
-                        new_map: Map::new(),
-                    };
-                    process_doc(&mut doc, config);
-                    output.output(&mut doc);
-                    count += 1;
+                    buffer.push(article);
+                    if buffer.len() == config.chunk_size {
+                        futures.push(
+                            pool.spawn_with_handle(process_buffer(
+                                buffer,
+                                config.clone(),
+                                output_manager.create_output_json(),
+                            ))
+                            .expect("Spawn error..."),
+                        );
+                        buffer = vec![];
+                    }
                 }
             }
             Err(_) => {
                 warn!("Read line error. line[{}]", count);
             }
         }
-        if count > 1 {
+        count += 1;
+        if count > 10001 {
             break;
         }
     }
-    output.flush();
+    //TODO handle last docs in buffer
+    if !buffer.is_empty() {
+        futures.push(
+            pool.spawn_with_handle(process_buffer(
+                buffer,
+                config.clone(),
+                output_manager.create_output_json(),
+            ))
+            .expect("Spawn error..."),
+        );
+    }
+    block_on(futures::future::join_all(futures));
 }
 
 fn process_doc(doc: &mut Document, config: &Config) {

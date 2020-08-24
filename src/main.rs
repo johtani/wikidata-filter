@@ -3,8 +3,22 @@ extern crate clap;
 use clap::{App, AppSettings, Arg};
 use log::info;
 use std::env;
+use std::time::Instant;
 use wikidata_head::parser::{parse_and_output, Config};
 
+macro_rules! measure {
+    ( $x:expr) => {{
+        let start = Instant::now();
+        let result = $x;
+        let end = start.elapsed();
+        println!(
+            "計測開始から{}.{:03}秒経過しました。",
+            end.as_secs(),
+            end.subsec_nanos() / 1_000_000
+        );
+        result
+    }};
+}
 fn main() {
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info");
@@ -51,6 +65,8 @@ fn main() {
 
     let config = Config::new(app.get_matches());
     info!("{:?}", config);
-    parse_and_output(&config);
+    measure!({
+        parse_and_output(&config);
+    });
     info!("Finish!...");
 }
