@@ -1,7 +1,6 @@
 use log::debug;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::time::Instant;
 
 pub struct OutputManager {
     path_prefix: String,

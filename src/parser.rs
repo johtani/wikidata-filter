@@ -233,7 +233,7 @@ pub fn parse_and_output(config: &Config) {
                 if !skip_parse(&article, &config) {
                     article.pop().unwrap();
                     buffer.push(article);
-                    if buffer.len() > config.chunk_size {
+                    if buffer.len() == config.chunk_size {
                         futures.push(
                             pool.spawn_with_handle(process_buffer(
                                 buffer,
