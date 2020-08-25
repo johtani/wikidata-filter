@@ -46,10 +46,10 @@ impl Config {
         return Config {
             input_file: input_file.to_string(),
             output_prefix: output_prefix.to_string(),
-            chunk_size: 100000,
+            chunk_size: 10000,
             properties,
             lang: lang.to_string(),
-            with_limiter: false,
+            with_limiter: true,
         };
     }
 }
@@ -199,6 +199,19 @@ async fn process_buffer(buffer: Vec<String>, config: Config, mut output: OutputJ
     debug!("finish process_buffer...");
 }
 
+fn skip_parse(article: &String, config: &Config) -> bool {
+    // need lang char in article
+    if article == "[" || article == "]" {
+        return true;
+    }
+    let pattern = format!("\"{}\"", &config.lang);
+    if !article.contains(pattern.as_str()) {
+        return true;
+    }
+    // TODO check properties?
+    return false;
+}
+
 pub fn parse_and_output(config: &Config) {
     let pool = ThreadPool::builder()
         .create()
@@ -217,10 +230,10 @@ pub fn parse_and_output(config: &Config) {
     for line in BufReader::new(buf).lines() {
         match line {
             Ok(mut article) => {
-                if article != "[" && article != "]" {
+                if !skip_parse(&article, &config) {
                     article.pop().unwrap();
                     buffer.push(article);
-                    if buffer.len() == config.chunk_size {
+                    if buffer.len() > config.chunk_size {
                         futures.push(
                             pool.spawn_with_handle(process_buffer(
                                 buffer,
