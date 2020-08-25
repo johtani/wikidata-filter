@@ -1,10 +1,11 @@
+use log::debug;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::time::Instant;
 
 pub struct OutputManager {
     path_prefix: String,
     file_counter: i32,
-    buffer: Vec<String>,
 }
 
 impl OutputManager {
@@ -12,7 +13,6 @@ impl OutputManager {
         OutputManager {
             path_prefix: path_prefix.to_string(),
             file_counter: 0,
-            buffer: vec![],
         }
     }
     pub fn create_output_json(&mut self) -> OutputJson {
@@ -24,6 +24,7 @@ impl OutputManager {
 
 pub struct OutputJson {
     file: File,
+    file_name: String,
     buffer: Vec<String>,
 }
 
@@ -35,6 +36,7 @@ impl OutputJson {
                 .create(true)
                 .open(file_path)
                 .expect(format!("can't open file[{}] with write option", file_path).as_str()),
+            file_name: file_path.to_string(),
             buffer: vec![],
         }
     }
@@ -44,10 +46,12 @@ impl OutputJson {
     }
 
     pub fn flush(&mut self) {
+        debug!("Call {} flush...", self.file_name);
         for str in &self.buffer {
             writeln!(self.file, "{}", str);
         }
         // TODO need?
         self.file.flush();
+        debug!("Finish {} flush...", self.file_name);
     }
 }
