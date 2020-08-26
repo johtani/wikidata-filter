@@ -1,5 +1,5 @@
 [package]
-name = "wikidata-head"
+name = "wikidata-filter"
 version = "0.1.0"
 authors = ["Jun Ohtani <johtani@gmail.com>"]
 edition = "2018"
@@ -18,5 +18,5 @@ futures = {version="0.3.5", features=["thread-pool"]}
 regex = "1.3.9"
 
 [[bin]]
-name = "wikidata-head"
+name = "wikidata-filter"
 path = "src/main.rs"

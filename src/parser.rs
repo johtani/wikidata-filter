@@ -125,26 +125,6 @@ impl Document {
         }
     }
 
-    fn copy_clone_ids(&self, item: &Value, clone_ids: &mut Vec<Value>) {
-        let map = item.as_object().expect("Claim object parse error...");
-        if let Some(mainsnak) = map.get("mainsnak") {
-            let mainsnak_map = mainsnak
-                .as_object()
-                .expect("Mainsnak object parse error...");
-            if let Some(datavalue) = mainsnak_map.get("datavalue") {
-                let datavalue_map = datavalue
-                    .as_object()
-                    .expect("Datavalue object parse error...");
-                if let Some(value) = datavalue_map.get("value") {
-                    let value_map = value.as_object().expect("Value object parse error...");
-                    if let Some(id) = value_map.get("id") {
-                        clone_ids.push(id.clone());
-                    }
-                }
-            }
-        }
-    }
-
     pub fn copy_claims(&mut self, config: &Config) {
         if let Some(obj) = self.original_map.get("claims") {
             let map = obj
@@ -226,7 +206,12 @@ impl Document {
 async fn process_buffer(buffer: Vec<String>, config: Config, mut output: OutputJson) {
     debug!("start process_buffer...");
     measure!({
-        for article in buffer {
+        for mut article in buffer {
+            //TODO 最後の行の処理
+            let last = article.pop().unwrap();
+            if last != ',' {
+                article.push(last);
+            }
             let mut doc = Document {
                 original_map: serde_json::from_str(article.as_str())
                     .expect("something wrong during parsing json"),
@@ -243,11 +228,12 @@ async fn process_buffer(buffer: Vec<String>, config: Config, mut output: OutputJ
 fn skip_parse(article: &str, config: &Config) -> bool {
     // need lang chars in article
     // TODO check properties?
-    return if article.len() > 1 {
-        !config.lang_regex.is_match(article)
-    } else {
-        true
-    };
+    return !config.lang_regex.is_match(article);
+    // return if article.len() > 1 {
+    //     !config.lang_regex.is_match(article)
+    // } else {
+    //     true
+    // };
 }
 
 pub fn parse_and_output(config: &Config) {
@@ -264,15 +250,11 @@ pub fn parse_and_output(config: &Config) {
     let buf = BzDecoder::new(file);
     let mut count = 0;
     let mut buffer: Vec<String> = vec![];
+
     for line in BufReader::new(buf).lines() {
         match line {
-            Ok(mut article) => {
+            Ok(article) => {
                 if !skip_parse(&article, &config) {
-                    //TODO 最後の行の処理
-                    let last = article.pop().unwrap();
-                    if last != ',' {
-                        article.push(last);
-                    }
                     buffer.push(article);
                     if buffer.len() == config.chunk_size {
                         futures.push(
@@ -315,7 +297,9 @@ pub fn parse_and_output(config: &Config) {
         );
     }
     debug!("before block_on...");
-    block_on(futures::future::join_all(futures));
+    measure!({
+        block_on(futures::future::join_all(futures));
+    });
     debug!("finish block_on...");
 }
 

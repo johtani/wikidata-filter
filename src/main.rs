@@ -4,7 +4,7 @@ use clap::{App, AppSettings, Arg};
 use log::info;
 use std::env;
 use std::time::Instant;
-use wikidata_head::parser::{parse_and_output, Config};
+use wikidata_filter::parser::{parse_and_output, Config};
 
 macro_rules! measure {
     ( $x:expr) => {{
