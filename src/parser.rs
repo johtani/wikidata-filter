@@ -6,7 +6,7 @@ use futures::executor::{block_on, ThreadPool};
 use futures::task::SpawnExt;
 use log::{debug, info, warn};
 use regex::Regex;
-//use serde_derive::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value::Array;
 use serde_json::{Map, Value};
 use std::fs::File;
@@ -26,6 +26,7 @@ macro_rules! measure {
         result
     }};
 }
+
 // macro_rules! measure_ns {
 //     ( $x:expr) => {{
 //         let start = Instant::now();
@@ -69,26 +70,26 @@ impl Config {
     }
 }
 
-// #[derive(Debug, Serialize, Deserialize)]
-// struct Claim {
-//     mainsnak: Mainsnak,
-// }
-//
-// #[derive(Debug, Serialize, Deserialize)]
-// struct Mainsnak {
-//     datatype: String,
-//     datavalue: Datavalue,
-// }
-//
-// #[derive(Debug, Serialize, Deserialize)]
-// struct Datavalue {
-//     value: ValueItem,
-// }
-//
-// #[derive(Debug, Serialize, Deserialize)]
-// struct ValueItem {
-//     id: Option<String>,
-// }
+#[derive(Debug, Serialize, Deserialize)]
+struct Claim {
+    mainsnak: Mainsnak,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Mainsnak {
+    datatype: String,
+    datavalue: Datavalue,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Datavalue {
+    value: ValueItem,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ValueItem {
+    id: Option<String>,
+}
 
 #[derive(Debug)]
 pub struct Document {
@@ -115,14 +116,14 @@ impl Document {
     pub fn copy_aliases(&mut self, config: &Config) {
         self.copy_lang_values(config, "aliases");
     }
-    //
-    // fn copy_clone_ids_with_struct(&self, item: &Value, clone_ids: &mut Vec<Value>) {
-    //     let prop_obj: Claim =
-    //         serde_json::from_value(item.clone()).expect("Claim object parse error...");
-    //     if let Some(id) = prop_obj.mainsnak.datavalue.value.id {
-    //         clone_ids.push(serde_json::to_value(id).expect("mainsnak id copy error..."));
-    //     }
-    // }
+
+    fn copy_clone_ids_with_struct(&self, item: &Value, clone_ids: &mut Vec<Value>) {
+        let prop_obj: Claim =
+            serde_json::from_value(item.clone()).expect("Claim object parse error...");
+        if let Some(id) = prop_obj.mainsnak.datavalue.value.id {
+            clone_ids.push(serde_json::to_value(id).expect("mainsnak id copy error..."));
+        }
+    }
 
     fn copy_clone_ids(&self, item: &Value, clone_ids: &mut Vec<Value>) {
         let map = item.as_object().expect("Claim object parse error...");
@@ -158,7 +159,7 @@ impl Document {
                     );
                     for item in prop_array {
                         //measure_ns!({
-                        &self.copy_clone_ids(item, &mut clone_ids);
+                        &self.copy_clone_ids_with_struct(item, &mut clone_ids);
                         //});
                     }
                     if !clone_ids.is_empty() {
@@ -263,7 +264,6 @@ pub fn parse_and_output(config: &Config) {
     let buf = BzDecoder::new(file);
     let mut count = 0;
     let mut buffer: Vec<String> = vec![];
-
     for line in BufReader::new(buf).lines() {
         match line {
             Ok(mut article) => {
@@ -296,7 +296,7 @@ pub fn parse_and_output(config: &Config) {
             info!("{} docs operated...", count);
         }
         if config.with_limiter {
-            if count > 10000 {
+            if count > 1000001 {
                 info!("{} docs operated...", count);
                 break;
             }
