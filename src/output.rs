@@ -47,10 +47,10 @@ impl OutputJson {
     pub fn flush(&mut self) {
         debug!("Call {} flush...", self.file_name);
         for str in &self.buffer {
-            writeln!(self.file, "{}", str);
+            writeln!(self.file, "{}", str).expect("Error on write!");
         }
         // TODO need?
-        self.file.flush();
+        self.file.flush().expect("Error on flush");
         debug!("Finish {} flush...", self.file_name);
     }
 }
