@@ -62,6 +62,14 @@ fn main() {
             .default_value("ja")
             .required(false)
             .takes_value(true)
+        ).arg(
+        Arg::with_name("LIMITS")
+            .help("The limit number of reading lines from json file. If --limit is 100, the command only read first 100 lines. If set 0, the command proceed all lines.")
+            .long("limit")
+            .default_value("0")
+            .required(false)
+            .min_values(0)
+            .takes_value(true)
         );
 
     let config = Config::new(app.get_matches());

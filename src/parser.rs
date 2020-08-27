@@ -2,6 +2,7 @@ use crate::output::{OutputJson, OutputManager};
 use bzip2::read::BzDecoder;
 use clap::ArgMatches;
 use core::result::Result::{Err, Ok};
+use flate2::read::{GzDecoder, MultiGzDecoder};
 use futures::executor::{block_on, ThreadPool};
 use futures::task::SpawnExt;
 use log::{debug, info, warn};
@@ -9,7 +10,8 @@ use regex::Regex;
 use serde_json::value::Value::Array;
 use serde_json::{Map, Value};
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
+use std::str::FromStr;
 use std::time::Instant;
 
 macro_rules! measure {
@@ -44,6 +46,7 @@ pub struct Config {
     properties: Vec<String>,
     lang: String,
     with_limiter: bool,
+    limit: u64,
     lang_regex: Regex,
 }
 
@@ -57,13 +60,16 @@ impl Config {
             .split(",")
             .map(|x| x.to_uppercase().to_string())
             .collect();
+        let limit_str = args.value_of("LIMITS").unwrap();
+        let limit = u64::from_str(limit_str).expect("aa");
         return Config {
             input_file: input_file.to_string(),
             output_prefix: output_prefix.to_string(),
             chunk_size: 100000,
             properties,
             lang: lang.to_string(),
-            with_limiter: false,
+            with_limiter: limit > 0,
+            limit,
             lang_regex: Regex::new(format!("\"{}\"", lang).as_str()).unwrap(),
         };
     }
@@ -232,7 +238,8 @@ pub fn parse_and_output(config: &Config) {
 
     info!("open file...");
     let file = File::open(input_file).expect("Input file open error");
-    let buf = BzDecoder::new(file);
+    //let buf = BzDecoder::new(file);
+    let buf = MultiGzDecoder::new(file);
     let mut count = 0;
     let mut buffer: Vec<String> = vec![];
 
@@ -263,7 +270,7 @@ pub fn parse_and_output(config: &Config) {
             info!("{} docs operated...", count);
         }
         if config.with_limiter {
-            if count > 1000001 {
+            if count > config.limit {
                 info!("{} docs operated...", count);
                 break;
             }
