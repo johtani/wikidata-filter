@@ -36,7 +36,7 @@ fn main() {
         .version_short("v")
         .arg(
             Arg::with_name("INPUT_FILE")
-                .help("The file path of Wikidata dump JSON, e.g. `latest-all.json.bz2`. ")
+                .help("The file path of Wikidata dump JSON gzip, e.g. `latest-all.json.gz`. ")
                 .value_name("INPUT_FILE")
                 .required(true)
                 .takes_value(true),

@@ -4,8 +4,8 @@ Parse wikidata all json and filter with `lang` and `claims` properties.
 
 ## Source Data
 
-Now, this supports only Wikidata all json bzip2 file.
-Please download `latest-all.json.bz2` from https://dumps.wikimedia.org/wikidatawiki/entities/ .
+Now, this supports only Wikidata all json gzip file.
+Please download `latest-all.json.gz` from https://dumps.wikimedia.org/wikidatawiki/entities/ .
 
 ### sample output json
 
@@ -21,11 +21,11 @@ Please download `latest-all.json.bz2` from https://dumps.wikimedia.org/wikidataw
 
 ## Usage
 
-`cargo run --release <PATH/TO/latest-all.json.bz2> <PATH/TO/OUTPUT_PREFIX> <OPTIONS>`
+`cargo run --release <PATH/TO/latest-all.json.gz> <PATH/TO/OUTPUT_PREFIX> <OPTIONS>`
 
 or 
 
-`./target/release/wikidata-filter <PATH/TO/latest-all.json.bz2> <PATH/TO/OUTPUT_PREFIX> <OPTIONS>`
+`./target/release/wikidata-filter <PATH/TO/latest-all.json.gz> <PATH/TO/OUTPUT_PREFIX> <OPTIONS>`
 
 ### Options
 
