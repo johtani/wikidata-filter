@@ -6,7 +6,6 @@ use futures::executor::{block_on, ThreadPool};
 use futures::task::SpawnExt;
 use log::{debug, info, warn};
 use regex::Regex;
-use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value::Array;
 use serde_json::{Map, Value};
 use std::fs::File;
@@ -64,31 +63,10 @@ impl Config {
             chunk_size: 100000,
             properties,
             lang: lang.to_string(),
-            with_limiter: true,
+            with_limiter: false,
             lang_regex: Regex::new(format!("\"{}\"", lang).as_str()).unwrap(),
         };
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claim {
-    mainsnak: Mainsnak,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Mainsnak {
-    datatype: String,
-    datavalue: Datavalue,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Datavalue {
-    value: ValueItem,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ValueItem {
-    id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -117,11 +95,23 @@ impl Document {
         self.copy_lang_values(config, "aliases");
     }
 
-    fn copy_clone_ids_with_struct(&self, item: &Value, clone_ids: &mut Vec<Value>) {
-        let prop_obj: Claim =
-            serde_json::from_value(item.clone()).expect("Claim object parse error...");
-        if let Some(id) = prop_obj.mainsnak.datavalue.value.id {
-            clone_ids.push(serde_json::to_value(id).expect("mainsnak id copy error..."));
+    fn copy_clone_ids(&self, item: &Value, clone_ids: &mut Vec<Value>) {
+        let map = item.as_object().expect("Claim object parse error...");
+        if let Some(mainsnak) = map.get("mainsnak") {
+            let mainsnak_map = mainsnak
+                .as_object()
+                .expect("Mainsnak object parse error...");
+            if let Some(datavalue) = mainsnak_map.get("datavalue") {
+                let datavalue_map = datavalue
+                    .as_object()
+                    .expect("Datavalue object parse error...");
+                if let Some(value) = datavalue_map.get("value") {
+                    let value_map = value.as_object().expect("Value object parse error...");
+                    if let Some(id) = value_map.get("id") {
+                        clone_ids.push(id.clone());
+                    }
+                }
+            }
         }
     }
 
@@ -139,7 +129,7 @@ impl Document {
                     );
                     for item in prop_array {
                         //measure_ns!({
-                        &self.copy_clone_ids_with_struct(item, &mut clone_ids);
+                        &self.copy_clone_ids(item, &mut clone_ids);
                         //});
                     }
                     if !clone_ids.is_empty() {
@@ -229,11 +219,6 @@ fn skip_parse(article: &str, config: &Config) -> bool {
     // need lang chars in article
     // TODO check properties?
     return !config.lang_regex.is_match(article);
-    // return if article.len() > 1 {
-    //     !config.lang_regex.is_match(article)
-    // } else {
-    //     true
-    // };
 }
 
 pub fn parse_and_output(config: &Config) {
