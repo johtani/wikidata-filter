@@ -2,23 +2,9 @@
 extern crate clap;
 use clap::{App, AppSettings, Arg};
 use log::info;
+use metered::{measure, ResponseTime};
 use std::env;
-use std::time::Instant;
 use wikidata_filter::parser::{parse_and_output, Config};
-
-macro_rules! measure {
-    ( $x:expr) => {{
-        let start = Instant::now();
-        let result = $x;
-        let end = start.elapsed();
-        println!(
-            "計測開始から{}.{:03}秒経過しました。",
-            end.as_secs(),
-            end.subsec_nanos() / 1_000_000
-        );
-        result
-    }};
-}
 
 fn main() {
     if env::var("RUST_LOG").is_err() {
@@ -73,9 +59,11 @@ fn main() {
         );
 
     let config = Config::new(app.get_matches());
+    let ref response_time: ResponseTime = ResponseTime::default();
     info!("{:?}", config);
-    measure!({
+    measure!(response_time, {
         parse_and_output(&config);
     });
     info!("Finish!...");
+    info!("{}", serde_json::to_string(&response_time).unwrap());
 }

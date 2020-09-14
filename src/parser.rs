@@ -1,8 +1,7 @@
 use crate::output::{OutputJson, OutputManager};
-use bzip2::read::BzDecoder;
 use clap::ArgMatches;
 use core::result::Result::{Err, Ok};
-use flate2::read::{GzDecoder, MultiGzDecoder};
+use flate2::read::MultiGzDecoder;
 use futures::executor::{block_on, ThreadPool};
 use futures::task::SpawnExt;
 use log::{debug, info, warn};
@@ -10,33 +9,8 @@ use regex::Regex;
 use serde_json::value::Value::Array;
 use serde_json::{Map, Value};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::str::FromStr;
-use std::time::Instant;
-
-macro_rules! measure {
-    ( $x:expr) => {{
-        let start = Instant::now();
-        let result = $x;
-        let end = start.elapsed();
-        println!(
-            "parser 計測開始から{}.{:03}秒経過しました。",
-            end.as_secs(),
-            end.subsec_nanos() / 1_000_000
-        );
-        result
-    }};
-}
-
-// macro_rules! measure_ns {
-//     ( $x:expr) => {{
-//         let start = Instant::now();
-//         let result = $x;
-//         let end = start.elapsed();
-//         println!("  a_{}", end.subsec_nanos());
-//         result
-//     }};
-// }
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -201,22 +175,20 @@ impl Document {
 
 async fn process_buffer(buffer: Vec<String>, config: Config, mut output: OutputJson) {
     debug!("start process_buffer...");
-    measure!({
-        for mut article in buffer {
-            //TODO 最後の行の処理
-            let last = article.pop().unwrap();
-            if last != ',' {
-                article.push(last);
-            }
-            let mut doc = Document {
-                original_map: serde_json::from_str(article.as_str())
-                    .expect("something wrong during parsing json"),
-                new_map: Map::new(),
-            };
-            process_doc(&mut doc, &config);
-            output.output(doc.to_json_string());
+    for mut article in buffer {
+        //TODO 最後の行の処理
+        let last = article.pop().unwrap();
+        if last != ',' {
+            article.push(last);
         }
-    });
+        let mut doc = Document {
+            original_map: serde_json::from_str(article.as_str())
+                .expect("something wrong during parsing json"),
+            new_map: Map::new(),
+        };
+        process_doc(&mut doc, &config);
+        output.output(doc.to_json_string());
+    }
     output.flush();
     debug!("finish process_buffer...");
 }
@@ -289,9 +261,7 @@ pub fn parse_and_output(config: &Config) {
         );
     }
     debug!("before block_on...");
-    measure!({
-        block_on(futures::future::join_all(futures));
-    });
+    block_on(futures::future::join_all(futures));
     debug!("finish block_on...");
 }
 
@@ -336,6 +306,7 @@ mod tests {
             properties: vec![String::from("P31")],
             lang: String::from("ja"),
             with_limiter: true,
+            limit: 0,
             lang_regex: Regex::new(format!("\"{}\"", "ja").as_str()).unwrap(),
         };
     }
